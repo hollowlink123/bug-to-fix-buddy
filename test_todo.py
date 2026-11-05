@@ -105,5 +105,19 @@ class TodoPersistenceTests(unittest.TestCase):
         self.assertEqual(self.tasks_file.read_bytes(), malformed_contents)
 
 
+    def test_duplicate_task_ids_are_rejected_without_overwriting_save(self):
+        duplicate_tasks = [
+            {"id": 1, "title": "First", "done": False},
+            {"id": 1, "title": "Second", "done": False},
+        ]
+        self.tasks_file.write_text(json.dumps(duplicate_tasks), encoding="utf-8")
+        original_contents = self.tasks_file.read_bytes()
+
+        result = self.run_cli("done", "1")
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("duplicate task ID", result.stderr)
+        self.assertEqual(self.tasks_file.read_bytes(), original_contents)
+
 if __name__ == "__main__":
     unittest.main()

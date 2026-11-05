@@ -28,11 +28,15 @@ def load_tasks(path=TASKS_FILE):
     if not isinstance(loaded_tasks, list):
         raise InvalidTaskDataError("the top-level JSON value must be a list")
 
+    seen_ids = set()
     for index, task in enumerate(loaded_tasks):
         if not isinstance(task, dict):
             raise InvalidTaskDataError(f"task {index + 1} must be an object")
         if isinstance(task.get("id"), bool) or not isinstance(task.get("id"), int):
             raise InvalidTaskDataError(f"task {index + 1} must have an integer ID")
+        if task["id"] in seen_ids:
+            raise InvalidTaskDataError(f"duplicate task ID {task['id']}")
+        seen_ids.add(task["id"])
         if not isinstance(task.get("title"), str):
             raise InvalidTaskDataError(f"task {index + 1} must have a string title")
         if not isinstance(task.get("done"), bool):
