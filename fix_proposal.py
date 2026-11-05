@@ -65,6 +65,20 @@ def create_proposal(report, summary, rationale, proposed_change, patch):
     }
 
 
+def _read_multiline_patch(stream=None):
+    """Read a unified diff through an explicit END_PATCH line."""
+    stream = sys.stdin if stream is None else stream
+    patch_lines = []
+    for line in stream:
+        if line.rstrip("\r\n") == "END_PATCH":
+            patch = "".join(patch_lines)
+            if not patch.strip():
+                raise ValueError("Unified diff patch cannot be empty.")
+            return patch
+        patch_lines.append(line)
+    raise ValueError("Unified diff patch ended before the END_PATCH terminator.")
+
+
 def save_proposal(proposal, proposals_dir=PROPOSALS_DIR):
     """Create a proposal file once; an existing ID can never be overwritten."""
     proposals_dir = Path(proposals_dir)
@@ -126,7 +140,8 @@ def format_preview(proposal, digest=None, review=None):
         lines.append(f"Version SHA-256: {digest}")
     if review:
         lines.append(f"Decision recorded: {review['decided_at']}")
-    return "\n".join(lines)
+    lines.extend(("", "Unified diff patch:"))
+    return "\n".join(lines) + "\n" + proposal["patch"]
 
 
 def record_decision(
@@ -184,12 +199,17 @@ def main(argv=None):
     try:
         if args.command == "create":
             report = load_report_by_id(args.report_id)
+            summary = input("Proposal summary: ")
+            rationale = input("Rationale: ")
+            proposed_change = input("Proposed change: ")
+            print("Paste the unified diff; finish with END_PATCH on a line by itself.")
+            patch = _read_multiline_patch()
             proposal = create_proposal(
                 report,
-                input("Proposal summary: "),
-                input("Rationale: "),
-                input("Proposed change: "),
-                input("Unified diff patch: "),
+                summary,
+                rationale,
+                proposed_change,
+                patch,
             )
             path = save_proposal(proposal)
             print(f"Created pending proposal {proposal['id']} at {path}.")

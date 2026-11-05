@@ -1,3 +1,4 @@
+import io
 import json
 import tempfile
 import unittest
@@ -5,6 +6,7 @@ from pathlib import Path
 
 from bug_report import create_report, save_report
 from fix_proposal import (
+    _read_multiline_patch,
     create_proposal,
     format_preview,
     load_proposal_by_id,
@@ -54,6 +56,23 @@ class FixProposalTests(unittest.TestCase):
         self.assertNotEqual(first_path, second_path)
         self.assertEqual(load_proposal_by_id(first["id"], self.proposals_dir), first)
 
+    def test_multiline_patch_reader_preserves_all_lines_until_terminator(self):
+        patch = (
+            "--- a/sample.py\n"
+            "+++ b/sample.py\n"
+            "@@ -1 +1 @@\n"
+            "-value = 1\n"
+            "+value = 2\n"
+        )
+        stream = io.StringIO(patch + "END_PATCH\nextra input\n")
+
+        self.assertEqual(_read_multiline_patch(stream), patch)
+        self.assertEqual(stream.readline(), "extra input\n")
+
+    def test_multiline_patch_reader_rejects_missing_terminator(self):
+        with self.assertRaisesRegex(ValueError, "END_PATCH"):
+            _read_multiline_patch(io.StringIO("--- a/sample.py\n"))
+
     def test_preview_is_readable_and_includes_version_hash(self):
         proposal = self.make_proposal()
         save_proposal(proposal, self.proposals_dir)
@@ -61,6 +80,7 @@ class FixProposalTests(unittest.TestCase):
         preview = format_preview(proposal, digest)
         for expected in (proposal["id"], "pending", proposal["summary"], proposal["rationale"], proposal["proposed_change"], digest):
             self.assertIn(expected, preview)
+        self.assertIn(f"Unified diff patch:\n{proposal['patch']}", preview)
 
     def test_approval_or_rejection_is_bound_to_exact_proposal_version(self):
         approved = self.make_proposal()
