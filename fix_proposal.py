@@ -38,7 +38,7 @@ def load_report_by_id(report_id, reports_dir=REPORTS_DIR):
     return report
 
 
-def create_proposal(report, summary, rationale, proposed_change):
+def create_proposal(report, summary, rationale, proposed_change, patch):
     """Build a pending proposal. A revision is a new proposal with a new ID."""
     if not isinstance(report, dict) or not report.get("id"):
         raise ValueError("A saved bug report is required to create a proposal.")
@@ -46,6 +46,7 @@ def create_proposal(report, summary, rationale, proposed_change):
         "summary": summary,
         "rationale": rationale,
         "proposed_change": proposed_change,
+        "patch": patch,
     }
     for name, value in fields.items():
         if not isinstance(value, str) or not value.strip():
@@ -57,6 +58,8 @@ def create_proposal(report, summary, rationale, proposed_change):
         "summary": summary.strip(),
         "rationale": rationale.strip(),
         "proposed_change": proposed_change.strip(),
+        # Keep diff line endings intact; the parser relies on their boundaries.
+        "patch": patch,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
     }
@@ -186,6 +189,7 @@ def main(argv=None):
                 input("Proposal summary: "),
                 input("Rationale: "),
                 input("Proposed change: "),
+                input("Unified diff patch: "),
             )
             path = save_proposal(proposal)
             print(f"Created pending proposal {proposal['id']} at {path}.")

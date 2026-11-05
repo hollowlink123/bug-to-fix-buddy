@@ -35,6 +35,7 @@ class FixProposalTests(unittest.TestCase):
             summary,
             "The setting is optional and can be absent.",
             "Check for the setting before reading it.",
+            "--- a/sample.py\n+++ b/sample.py\n@@ -1 +1 @@\n-value = 1\n+value = 2\n",
         )
 
     def test_load_saved_report_by_id_and_missing_report(self):
