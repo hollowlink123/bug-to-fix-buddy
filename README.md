@@ -22,6 +22,12 @@ The Python command-line app in `todo.py`:
 
 - Uses only the Python standard library; no external Python packages are required.
 
+Local bug report intake is implemented in `bug_report.py`. Submit a report with `py bug_report.py "Describe the bug"`; report JSON files are stored under `bug_reports/` and ignored by Git.
+
+Fix proposals are implemented in `fix_proposal.py`. Create a proposal for an existing report with `py fix_proposal.py create <report-id>` and enter its summary, rationale, and proposed change when prompted. Preview it with `py fix_proposal.py show <proposal-id>`. The preview displays the exact proposal file's SHA-256. Record a manually verified Switch decision with `py fix_proposal.py decide <proposal-id> approve --sha256 <sha256>` or use `reject` instead. Decisions are saved separately under `fix_proposals/reviews/`; proposal JSON files and their contents are never overwritten. Any revision is a new proposal with a new ID. Git ignores proposal and review JSON files.
+
+The local Python CLI records a manually verified decision received through Switch. It cannot independently authenticate the Switch sender. Approval and rejection only record a decision: they never modify source code, and proposal patch application is not implemented.
+
 The task-ID bug was that IDs started at 1 but were mistakenly used as Python list positions, which start at 0. That caused task 1 to update the second task, and the last task ID could raise an error. The fix updates the task found by its ID:
 
 ```python
@@ -78,7 +84,7 @@ The project owner reported all six tests passing on Windows and manually verifie
 
 The report, code investigation, explanation, proposed fix, and owner review were demonstrated in the Switch room connected to `#bug-to-fix-demo`. The agent inspected the project and explained the task-ID bug; the owner reviewed and approved the fix. This workflow is a human-reviewed collaboration process shown through Switch conversations.
 
-The Python CLI and JSON persistence are implemented in this repository. Automated bug tracking and an automatic integration between the Python app and Switch are not implemented.
+The Python CLI and JSON persistence are implemented in this repository. Automated bug tracking and an automatic integration between the Python app and Switch are not implemented; a person must verify the Switch decision before recording it locally.
 
 ## Current limitations
 
@@ -89,3 +95,5 @@ The Python CLI and JSON persistence are implemented in this repository. Automate
 - Malformed JSON or invalid task data must be repaired manually; the app preserves the file and does not attempt recovery.
 
 - Automated bug tracking or app-to-Switch integration is not implemented.
+
+- Proposal decisions are local records of manually verified Switch messages. The CLI does not authenticate senders or apply proposed code changes.

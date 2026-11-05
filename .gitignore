@@ -5,3 +5,5 @@ venv/
 env/
 ENV/
 bug_reports/*.json
+fix_proposals/*.json
+fix_proposals/reviews/*.json
