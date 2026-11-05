@@ -69,9 +69,16 @@ class TodoPersistenceTests(unittest.TestCase):
 
         result = self.run_cli("done", "99")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("No task with ID 99.", result.stdout)
         self.assertEqual(self.tasks_file.read_bytes(), original_contents)
+
+    def test_unknown_id_returns_nonzero_without_creating_save(self):
+        result = self.run_cli("done", "99")
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("No task with ID 99.", result.stdout)
+        self.assertFalse(self.tasks_file.exists())
 
     def test_existing_task_data_and_extra_fields_survive_save(self):
         original_tasks = [
@@ -97,6 +104,20 @@ class TodoPersistenceTests(unittest.TestCase):
         self.assertIn("Could not load tasks", result.stderr)
         self.assertEqual(self.tasks_file.read_bytes(), malformed_contents)
 
+
+    def test_duplicate_task_ids_are_rejected_without_overwriting_save(self):
+        duplicate_tasks = [
+            {"id": 1, "title": "First", "done": False},
+            {"id": 1, "title": "Second", "done": False},
+        ]
+        self.tasks_file.write_text(json.dumps(duplicate_tasks), encoding="utf-8")
+        original_contents = self.tasks_file.read_bytes()
+
+        result = self.run_cli("done", "1")
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("duplicate task ID", result.stderr)
+        self.assertEqual(self.tasks_file.read_bytes(), original_contents)
 
 if __name__ == "__main__":
     unittest.main()
