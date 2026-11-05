@@ -69,9 +69,16 @@ class TodoPersistenceTests(unittest.TestCase):
 
         result = self.run_cli("done", "99")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("No task with ID 99.", result.stdout)
         self.assertEqual(self.tasks_file.read_bytes(), original_contents)
+
+    def test_unknown_id_returns_nonzero_without_creating_save(self):
+        result = self.run_cli("done", "99")
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("No task with ID 99.", result.stdout)
+        self.assertFalse(self.tasks_file.exists())
 
     def test_existing_task_data_and_extra_fields_survive_save(self):
         original_tasks = [

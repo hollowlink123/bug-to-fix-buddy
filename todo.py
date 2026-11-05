@@ -135,6 +135,8 @@ def main(argv=None):
 
     if command == "done":
         changed = complete_task(task_id, tasks)
+        if not changed:
+            return 1
     else:
         changed = run_demo(tasks)
 
