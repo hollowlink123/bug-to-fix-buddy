@@ -1,99 +1,173 @@
 # Bug-to-Fix Buddy
 
-A beginner-friendly demo for the WeMakeDevs Flip the Switch hackathon. The project pairs a small Python to-do list with a bug-investigation workflow demonstrated through Switch.
+Bug-to-Fix Buddy is a human-reviewed bug-fixing workflow built around a small Python to-do list. It demonstrates how a bug report can be investigated by an AI agent, turned into a proposed code fix, reviewed by a person, and applied after approval.
 
-## The problem
+Built for the WeMakeDevs Flip the Switch hackathon.
 
-When a task is marked complete by its ID, a program can accidentally update a different task. Finding and explaining a bug also takes time, especially when a report does not include the details a developer needs.
+## The Problem
 
-Bug-to-Fix Buddy demonstrates how a teammate can report an issue, an AI agent can inspect the code and explain a proposed fix, and a person can review the change.
+A program can accidentally update the wrong task when it treats a task ID as a list position. Finding the cause of a bug and preparing a safe fix can also take time.
 
-## What is implemented
+Bug-to-Fix Buddy demonstrates a workflow where an AI agent helps investigate a reported issue and explain a proposed fix, while a person remains responsible for reviewing and approving the change.
+
+## How It Works
+
+1. **Report a bug:** A person submits a description of the problem.
+2. **Investigate:** An AI agent inspects the code and explains the cause.
+3. **Propose a fix:** A proposal contains the rationale, proposed change, and unified diff patch.
+4. **Review:** A person reviews the proposal and records an approval or rejection.
+5. **Apply:** The approved patch is previewed and applied after confirmation.
+6. **Verify:** Tests and a manual check confirm the behavior.
+
+## The Demonstration Bug
+
+The to-do list uses task IDs starting at 1, while Python list positions start at 0. Using a task ID directly as a list position can select the wrong task.
+
+The fix searches for the task by its ID:
+
+```python
+matching_task = next(
+    (task for task in tasks if task["id"] == task_id),
+    None,
+)
+```
+
+This ensures that completing task 1 updates task 1, rather than task 2.
+
+## Features
 
 The Python command-line app in `todo.py`:
 
 - Starts with two example tasks.
-
 - Lists tasks and marks a task complete by its ID.
-
 - Provides a `demo` command that completes task 1.
+- Saves tasks as JSON in `tasks.json` beside `todo.py`.
+- Preserves completed tasks across separate command runs.
+- Uses only the Python standard library.
 
-- Saves tasks as JSON in `tasks.json` next to `todo.py`, so completed tasks persist across command runs.
+The project also includes:
 
-- Uses only the Python standard library; no external Python packages are required.
+- Local bug report intake in `bug_report.py`.
+- Fix proposal creation, preview, and decision recording in `fix_proposal.py`.
+- A patch preview and application tool in `fix_apply.py`.
+- Automated tests for the to-do app and its persistence behavior.
 
-Local bug report intake is implemented in `bug_report.py`. Submit a report with `py bug_report.py "Describe the bug"`; report JSON files are stored under `bug_reports/` and ignored by Git.
+## Run the To-Do Demo
 
-Fix proposals are implemented in `fix_proposal.py`. Create a proposal for an existing report with `py fix_proposal.py create <report-id>` and enter its summary, rationale, human-readable proposed change, and unified diff patch when prompted. Preview it with `py fix_proposal.py show <proposal-id>`. The preview displays the exact proposal file's SHA-256. Because the hash covers the complete proposal JSON, it binds approval to the explanation and patch. Record a manually verified Switch decision with `py fix_proposal.py decide <proposal-id> approve --sha256 <sha256>` or use `reject` instead. Decisions are saved separately under `fix_proposals/reviews/`; proposal JSON files and their contents are never overwritten. Any revision is a new proposal with a new ID. Git ignores proposal, review, and application-result JSON files.
+Open a terminal in the project folder.
 
-The local Python CLI records a manually verified decision received through Switch. It cannot independently authenticate the Switch sender. After approval, preview and apply a proposal with `py fix_apply.py <proposal-id> <project-directory>`. The tool displays the complete changes and requires typing the proposal ID to continue. It accepts only simple unified diffs that update existing UTF-8 files; it rejects new/deleted files, renames, symlinks, traversal paths, unsupported syntax, and source content that differs from the patch context. It does not run proposal-supplied commands. If file replacement fails, the tool attempts to restore files it already replaced, but restoration is not guaranteed if rollback also fails. If writing the application-result record fails after files were replaced successfully, the source files may be changed without a saved result. Application results are stored under `fix_proposals/applications/` when the record can be written.
-
-The task-ID bug was that IDs started at 1 but were mistakenly used as Python list positions, which start at 0. That caused task 1 to update the second task, and the last task ID could raise an error. The fix updates the task found by its ID:
-
-```python
-matching_task["done"] = True
-```
-
-## Run the demo
-
-Open a terminal in this project folder. To show the demo, which marks task 1 complete and saves it, run:
+Run the demo:
 
 ```powershell
 py todo.py demo
 ```
 
-To list tasks:
+List the tasks:
 
 ```powershell
 py todo.py list
 ```
 
-To complete task 2 directly:
+Complete task 2 directly:
 
 ```powershell
 py todo.py done 2
 ```
 
-If `tasks.json` does not exist, the program starts with the two example tasks. A successful `done` or `demo` command saves the updated tasks there. If the JSON is malformed or contains invalid task data, the program reports an error and leaves the file untouched; repair the file manually before running the app again.
+If `tasks.json` does not exist, the program starts with the two example tasks. Successful `done` and `demo` commands save the updated tasks.
+
+If the JSON file is malformed or contains invalid task data, the program reports an error and leaves the file untouched. The file must be repaired manually before running the app again.
+
+## Bug Report and Fix Proposal
+
+Submit a bug report:
+
+```powershell
+py bug_report.py "Describe the bug"
+```
+
+Report JSON files are stored under `bug_reports/` and ignored by Git.
+
+Create a proposal for an existing report:
+
+```powershell
+py fix_proposal.py create <report-id>
+```
+
+The CLI asks for the proposal summary, rationale, proposed change, and unified diff patch.
+
+Preview a proposal:
+
+```powershell
+py fix_proposal.py show <proposal-id>
+```
+
+The preview displays the proposal's SHA-256 hash. The hash covers the complete proposal JSON, binding the approval to the proposal content.
+
+Record a manually verified Switch decision:
+
+```powershell
+py fix_proposal.py decide --sha2 <sha256> <proposal-id> approve
+```
+
+Use `reject` instead of `approve` to reject the proposal.
+
+Decisions are saved separately under `fix_proposals/reviews/`. Proposal JSON files are not overwritten. A revision is recorded as a new proposal with a new ID.
+
+## Preview and Apply a Fix
+
+After approval, preview and apply a proposal:
+
+```powershell
+py fix_apply.py <proposal-id> <project-directory>
+```
+
+The tool displays the complete changes and requires typing the proposal ID to continue.
+
+It accepts supported unified diffs that update existing UTF-8 files. It rejects new or deleted files, renames, symlinks, traversal paths, unsupported syntax, and source content that differs from the patch context. It does not run commands supplied by a proposal.
+
+The tool attempts to restore files if a replacement fails, but rollback is not guaranteed if restoration also fails. If saving the application result fails after source files have been replaced, the source files may be changed without a saved result.
+
+Application results are stored under `fix_proposals/applications/` when the record can be written.
 
 ## Tests
 
-Run the automated tests from the project folder with:
+Run the automated tests from the project folder:
 
 ```powershell
 py -m unittest -v
 ```
 
-The six tests cover:
+The test suite checks:
 
-1. A fresh run lists the example tasks without creating a save file.
+- Listing example tasks on a fresh run.
+- Completing tasks by ID.
+- Saving task completion across command runs.
+- Ensuring the demo completes task 1 without changing task 2.
+- Handling unknown task IDs.
+- Preserving task fields during saving.
+- Reporting malformed JSON without overwriting it.
 
-2. Completing task 2 persists across separate command runs.
+The workflow was manually verified by applying the approved patch in a separate demo copy and confirming that completing task 1 leaves task 2 unfinished.
 
-3. `demo` saves task 1 as done and leaves task 2 unfinished.
+## Switch Collaboration
 
-4. An unknown task ID does not change saved data.
+The bug investigation and proposed fix were demonstrated in a Switch room connected to `#bug-to-fix-demo`.
 
-5. Existing task fields, including extra fields, survive a save.
+The agent inspected the code and explained the task-ID bug. The project owner reviewed and approved the proposed fix before it was applied.
 
-6. Malformed JSON is reported without being overwritten.
+The Python CLI, proposal handling, patch application, and JSON persistence are implemented in this repository. The Switch investigation was demonstrated through conversations. Automated bug tracking and an automatic integration between the Python app and Switch are not implemented.
 
-The project owner reported all six tests passing on Windows and manually verified that task 1 remains done after running `demo` and then `list` in separate commands.
+## Limitations
 
-## Bug investigation workflow demonstrated through Switch
+- The app starts with two example tasks. It does not include commands to add, edit, or delete tasks.
+- Task data is stored locally in `tasks.json` beside the script.
+- Malformed JSON or invalid task data must be repaired manually.
+- Proposal decisions are local records of manually verified Switch messages. The CLI cannot independently authenticate the sender.
+- The patch tool does not run proposal-supplied commands.
+- Proposal, review, and application-result JSON files are ignored by Git.
 
-The report, code investigation, explanation, proposed fix, and owner review were demonstrated in the Switch room connected to `#bug-to-fix-demo`. The agent inspected the project and explained the task-ID bug; the owner reviewed and approved the fix. This workflow is a human-reviewed collaboration process shown through Switch conversations.
+## Project Goal
 
-The Python CLI and JSON persistence are implemented in this repository. Automated bug tracking and an automatic integration between the Python app and Switch are not implemented; a person must verify the Switch decision before recording it locally.
+Bug-to-Fix Buddy demonstrates a human-reviewed AI-assisted bug-fixing workflow. An AI agent helps investigate a problem and prepare a code change, while a person retains control over approval and application.
 
-## Current limitations
-
-- There are no commands to add, edit, or delete tasks; the app starts with two examples unless the JSON file is edited manually.
-
-- Task data is stored locally in `tasks.json` beside the script, so the project folder must be writable and the file should be backed up if its contents matter.
-
-- Malformed JSON or invalid task data must be repaired manually; the app preserves the file and does not attempt recovery.
-
-- Automated bug tracking or app-to-Switch integration is not implemented.
-
-- Proposal decisions are local records of manually verified Switch messages. The CLI does not authenticate senders or apply proposed code changes.
