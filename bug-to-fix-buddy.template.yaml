@@ -440,7 +440,7 @@ room:
     Apply a change only after the user explicitly approves the exact proposal. Use `fix_apply.py` to validate the proposal, approval record, and selected target before applying the patch. If the target, proposal, approval, or patch validation fails, stop without writing changes.
     After applying the patch, inspect the changed files and report exactly what changed. Do not claim that tests passed unless they were actually run and passed. The application script does not automatically run the target project's tests, so ask the user to run the relevant tests separately.
 
-Do not commit or push.
+    Do not commit or push.
 
   bridge: "{bridge}"
   agents: ["{agent_name}"]
