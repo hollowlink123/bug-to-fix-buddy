@@ -17,6 +17,7 @@ from fix_proposal import (
     load_proposal_by_id,
     load_review,
     proposal_digest,
+    canonical_target_directory,
 )
 
 
@@ -29,6 +30,22 @@ def _approved_proposal(proposal_id, proposals_dir, reviews_dir):
     review = load_review(proposal_id, reviews_dir)
     if not review or review.get("decision") != "approved":
         raise ValueError("Only an approved proposal can be applied.")
+    proposal_target = proposal.get("target_directory")
+    proposal_target_id = proposal.get("target_id")
+    if (
+        not isinstance(proposal_target, str)
+        or not isinstance(proposal_target_id, str)
+        or not proposal_target_id
+    ):
+        raise ValueError("Proposal is missing target directory metadata; create a new proposal.")
+    canonical_target = canonical_target_directory(proposal_target)
+    if canonical_target != proposal_target:
+        raise ValueError("Proposal target directory metadata is invalid.")
+    if (
+        review.get("target_directory") != canonical_target
+        or review.get("target_id") != proposal_target_id
+    ):
+        raise ValueError("Approval target does not match the proposal target.")
     digest = proposal_digest(proposal_id, proposals_dir)
     if not hmac.compare_digest(digest, str(review.get("proposal_sha256", ""))):
         raise ValueError("Proposal content changed after approval.")
@@ -80,8 +97,8 @@ def parse_patch(patch, project_dir):
         try:
             with target.open("r", encoding="utf-8", newline="") as source_file:
                 original = source_file.read()
-        except (OSError, UnicodeDecodeError) as error:
-            raise ValueError(f"Could not read patch target {old_name} as UTF-8: {error}") from error
+        except (OSError, UnicodeDecodeError):
+            raise ValueError(f"Could not read patch target {old_name} as UTF-8.")
         original_lines = original.splitlines(keepends=True)
         line_ending = "\r\n" if "\r\n" in original else "\n"
         result = []
@@ -147,13 +164,21 @@ def parse_patch(patch, project_dir):
 
 def preview_application(proposal_id, project_dir, proposals_dir=PROPOSALS_DIR, reviews_dir=REVIEWS_DIR):
     proposal, digest = _approved_proposal(proposal_id, proposals_dir, reviews_dir)
-    changes = parse_patch(proposal["patch"], project_dir)
-    lines = [f"Proposal {proposal_id} (approved; SHA-256 {digest})", "Files:"]
+    selected_target = canonical_target_directory(project_dir)
+    if selected_target != proposal["target_directory"]:
+        raise ValueError("Selected project directory does not match the approved proposal target.")
+    changes = parse_patch(proposal["patch"], selected_target)
+    lines = [
+        f"Proposal {proposal_id} (approved; SHA-256 {digest})",
+        f"Target binding: {proposal['target_id']}",
+        "Files:",
+    ]
     for path, before, after in changes:
-        lines.append(f"- {path}")
+        relative_path = path.relative_to(selected_target).as_posix()
+        lines.append(f"- {relative_path}")
         old = before.decode("utf-8").splitlines(keepends=True)
         new = after.decode("utf-8").splitlines(keepends=True)
-        lines.extend(difflib.unified_diff(old, new, fromfile=str(path), tofile=str(path)))
+        lines.extend(difflib.unified_diff(old, new, fromfile=relative_path, tofile=relative_path))
     return "\n".join(lines), changes, digest
 
 
@@ -177,19 +202,26 @@ def apply_approved_proposal(
     if confirmation != proposal_id:
         raise ValueError("Application requires typing the exact proposal ID shown in the preview.")
     # Recheck the exact approved bytes immediately before any file is written.
-    _approved_proposal(proposal_id, proposals_dir, reviews_dir)
+    proposal, current_digest = _approved_proposal(proposal_id, proposals_dir, reviews_dir)
+    selected_target = canonical_target_directory(project_dir)
+    if selected_target != proposal["target_directory"]:
+        raise ValueError("Selected project directory does not match the approved proposal target.")
+    if not hmac.compare_digest(digest, current_digest):
+        raise ValueError("Proposal changed after preview; review the current version again.")
     replacements = {}
     backups = {}
     changed = []
     result = {
         "proposal_id": proposal_id, "proposal_sha256": digest,
+        "target_id": proposal["target_id"],
         "status": "failed", "applied_at": datetime.now(timezone.utc).isoformat(),
-        "files": [str(path) for path, _, _ in changes],
+        "files": [path.relative_to(selected_target).as_posix() for path, _, _ in changes],
     }
     try:
         for path, original, updated in changes:
             if path.read_bytes() != original:
-                raise ValueError(f"File changed after preview; review the patch again: {path}")
+                relative_path = path.relative_to(selected_target).as_posix()
+                raise ValueError(f"File changed after preview; review the patch again: {relative_path}")
             replacements[path] = _write_temp(path.parent, updated)
             backups[path] = _write_temp(path.parent, original)
         for path, _, _ in changes:
@@ -202,8 +234,13 @@ def apply_approved_proposal(
             try:
                 os.replace(backups[path], path)
             except OSError as rollback_error:
-                rollback_errors.append(f"{path}: {rollback_error}")
-        result["error"] = str(error)
+                relative_path = path.relative_to(selected_target).as_posix()
+                rollback_errors.append(
+                    f"{relative_path}: rollback failed ({type(rollback_error).__name__})."
+                )
+        # Failure records may be shared; avoid embedding absolute local paths
+        # from OS exception messages.
+        result["error"] = f"{type(error).__name__}: application failed; see local diagnostics."
         if rollback_errors:
             result["rollback_errors"] = rollback_errors
         raise
@@ -232,9 +269,12 @@ def main(argv=None):
         print(preview)
         confirmation = input("Type the proposal ID to apply these exact changes: ")
         result = apply_approved_proposal(args.proposal_id, args.project_dir, confirmation)
-        print(f"Application {result['status']}; result saved under {APPLICATIONS_DIR}.")
+        print(f"Application {result['status']}; result saved in the toolkit application records.")
         return 0
-    except (OSError, ValueError) as error:
+    except OSError as error:
+        print(f"{type(error).__name__}: local filesystem operation failed.", file=sys.stderr)
+        return 1
+    except ValueError as error:
         print(error, file=sys.stderr)
         return 1
 

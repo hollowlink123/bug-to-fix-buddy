@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -17,6 +18,17 @@ from bug_report import REPORTS_DIR, load_report
 
 PROPOSALS_DIR = Path(__file__).with_name("fix_proposals")
 REVIEWS_DIR = PROPOSALS_DIR / "reviews"
+
+
+def canonical_target_directory(target_directory):
+    """Return an existing target directory's canonical local path."""
+    try:
+        target = Path(target_directory).resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        raise ValueError("Target project directory must exist and resolve successfully.") from error
+    if not target.is_dir():
+        raise ValueError("Target project path must be a directory.")
+    return os.path.normcase(str(target))
 
 
 def _read_json(path, description):
@@ -38,7 +50,7 @@ def load_report_by_id(report_id, reports_dir=REPORTS_DIR):
     return report
 
 
-def create_proposal(report, summary, rationale, proposed_change, patch):
+def create_proposal(report, summary, rationale, proposed_change, patch, target_directory):
     """Build a pending proposal. A revision is a new proposal with a new ID."""
     if not isinstance(report, dict) or not report.get("id"):
         raise ValueError("A saved bug report is required to create a proposal.")
@@ -52,12 +64,18 @@ def create_proposal(report, summary, rationale, proposed_change, patch):
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"Proposal {name.replace('_', ' ')} cannot be empty.")
 
+    canonical_target = canonical_target_directory(target_directory)
+
     return {
         "id": uuid.uuid4().hex,
         "report_id": report["id"],
         "summary": summary.strip(),
         "rationale": rationale.strip(),
         "proposed_change": proposed_change.strip(),
+        # This local path is stored in the proposal and covered by its file hash.
+        "target_directory": canonical_target,
+        # Use a random label so previews never reveal a reversible path hash.
+        "target_id": uuid.uuid4().hex,
         # Keep diff line endings intact; the parser relies on their boundaries.
         "patch": patch,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -130,6 +148,7 @@ def format_preview(proposal, digest=None, review=None):
     lines = [
         f"Proposal: {proposal['id']}",
         f"Bug report: {proposal['report_id']}",
+        f"Target binding: {proposal.get('target_id', 'MISSING')}",
         f"Status: {status}",
         f"Summary: {proposal['summary']}",
         f"Rationale: {proposal['rationale']}",
@@ -158,6 +177,13 @@ def record_decision(
         raise ValueError("The reviewed proposal SHA-256 is required.")
 
     proposal = load_proposal_by_id(proposal_id, proposals_dir)
+    target_directory = proposal.get("target_directory")
+    target_id = proposal.get("target_id")
+    if not isinstance(target_directory, str) or not isinstance(target_id, str) or not target_id:
+        raise ValueError("Proposal is missing target directory metadata; create a new proposal.")
+    canonical_target = canonical_target_directory(target_directory)
+    if canonical_target != target_directory:
+        raise ValueError("Proposal target directory metadata is invalid; create a new proposal.")
     current_digest = proposal_digest(proposal_id, proposals_dir)
     if not hmac.compare_digest(current_digest, expected_sha256.lower()):
         raise ValueError("Proposal changed since preview; review the current version again.")
@@ -167,6 +193,8 @@ def record_decision(
     review = {
         "proposal_id": proposal_id,
         "proposal_sha256": current_digest,
+        "target_directory": canonical_target,
+        "target_id": target_id,
         "decision": "approved" if decision == "approve" else "rejected",
         "decided_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -199,6 +227,7 @@ def main(argv=None):
     try:
         if args.command == "create":
             report = load_report_by_id(args.report_id)
+            target_directory = input("Target project directory: ").strip()
             summary = input("Proposal summary: ")
             rationale = input("Rationale: ")
             proposed_change = input("Proposed change: ")
@@ -210,9 +239,10 @@ def main(argv=None):
                 rationale,
                 proposed_change,
                 patch,
+                target_directory,
             )
-            path = save_proposal(proposal)
-            print(f"Created pending proposal {proposal['id']} at {path}.")
+            save_proposal(proposal)
+            print(f"Created pending proposal {proposal['id']}.")
             return 0
         if args.command == "show":
             proposal = load_proposal_by_id(args.proposal_id)
@@ -225,7 +255,10 @@ def main(argv=None):
         print(f"Recorded {review['decision']} for proposal {args.proposal_id}.")
         print("This records a manually verified Switch decision; the CLI cannot authenticate its sender.")
         return 0
-    except (OSError, ValueError) as error:
+    except OSError as error:
+        print(f"{type(error).__name__}: local storage operation failed.", file=sys.stderr)
+        return 1
+    except ValueError as error:
         print(error, file=sys.stderr)
         return 1
 
