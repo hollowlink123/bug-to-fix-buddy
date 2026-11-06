@@ -1,264 +1,218 @@
 # Bug-to-Fix Buddy
 
-Bug-to-Fix Buddy is a human-reviewed, AI-assisted bug investigation and repair workflow built for the WeMakeDevs Flip the Switch hackathon.
+**Bug-to-Fix Buddy** is a human-reviewed, AI-assisted workflow for investigating software bugs and applying proposed code fixes.
 
-It demonstrates how an AI agent can investigate a reported software bug, identify its likely cause, prepare a reviewable code patch, and apply that patch after human approval.
+An AI agent helps investigate a reported issue, understand the relevant code, and prepare a proposed patch. A person reviews the proposal and explicitly approves it before the Python toolkit can apply the change.
 
-The project combines a Python-based bug and patch management workflow with agent collaboration through Switch and Slack.
-
-## The Problem
-
-Debugging software involves more than identifying an error. Developers need to understand the cause, evaluate a proposed change, avoid unintended modifications, and verify that the fix works.
-
-Bug-to-Fix Buddy explores a workflow in which an AI agent assists with investigation and patch preparation while a person retains control over approving and applying changes.
+The project explores how AI-assisted debugging can be made more structured, reviewable, and controlled.
 
 ## How It Works
 
-The workflow has six main stages:
+The workflow follows six stages:
 
-1. **Report:** A user submits a description of the bug.
-2. **Investigate:** The AI agent inspects the selected project and investigates the reported behavior.
-3. **Propose:** The agent prepares a fix proposal containing its rationale, proposed change, and unified diff.
-4. **Review:** A person reviews the proposal and approves or rejects it.
-5. **Apply:** The approved patch is previewed and applied after confirmation.
-6. **Verify:** Tests and other checks are used to verify the resulting behavior.
+1. **Report:** A user describes a software bug.
+2. **Investigate:** The AI agent examines the selected project and investigates the reported behavior.
+3. **Propose:** The agent prepares a fix proposal with an explanation and unified diff patch.
+4. **Review:** A person examines the proposed changes and approves or rejects the proposal.
+5. **Apply:** The Python toolkit validates the approval, previews the patch, and applies it after explicit confirmation.
+6. **Verify:** The resulting changes are inspected and relevant tests are run separately.
 
-Human approval is required before applying a proposed source-code patch. Git operations such as committing and pushing are separate actions.
+Human approval is required before a proposed patch is applied. Committing and pushing changes are separate operations and are not performed automatically.
 
-## Key Features
+## Features
 
-- Bug report creation and JSON-based storage.
-- Fix proposals containing a summary, rationale, proposed change, and unified diff.
-- SHA-256 hashes binding approval decisions to proposal contents.
-- Separate approval and rejection records.
-- Patch preview before application.
-- Validation of supported unified diff operations.
-- Protection against unsupported paths, symlinks, and mismatched patch context.
-- Temporary-file replacement and rollback attempts for multi-file patch application.
-- Automated tests for the Python application and workflow components.
+- **Bug reports:** Create and store structured bug reports as JSON files.
+- **Fix proposals:** Prepare proposals containing a summary, rationale, proposed change, and unified diff.
+- **Approval records:** Store approval or rejection decisions separately from the original proposal.
+- **Proposal integrity:** Use SHA-256 hashes to detect changes to a proposal after it has been reviewed.
+- **Target binding:** Bind proposals and approval records to the selected project directory and target binding ID.
+- **Patch preview:** Display proposed file changes before application.
+- **Patch validation:** Reject unsupported patch operations, unsafe paths, symlinks, and mismatched patch context.
+- **Safer application:** Check the approved proposal and target again before writing changes.
+- **Application records:** Record the result of a patch application.
+- **Automated tests:** Test bug reporting, proposal handling, patch validation, application, and the demonstration application.
 
-## Project Architecture
+## Project Structure
 
-The repository separates the workflow into several Python components.
-
-| File | Responsibility |
+| File or directory | Purpose |
 |---|---|
 | `bug_report.py` | Creates and loads bug reports |
-| `fix_proposal.py` | Creates proposals, previews them, and records approval or rejection decisions |
-| `fix_apply.py` | Validates, previews, and applies approved patches |
-| `todo.py` | Small Python application used for demonstrating bugs and fixes |
-| `test_bug_report.py` | Tests bug report behavior |
-| `test_fix_proposal.py` | Tests proposal and decision handling |
-| `test_fix_apply.py` | Tests patch application |
-| `test_todo.py` | Tests the to-do application |
+| `fix_proposal.py` | Creates proposals, previews them, and records approval or rejection |
+| `fix_apply.py` | Validates and applies approved patches |
+| `todo.py` | Small demonstration application used for bug scenarios |
+| `bug_reports/` | Stores generated bug reports |
+| `fix_proposals/` | Stores proposals, review decisions, and application records |
+| `test_bug_report.py` | Tests bug report handling |
+| `test_fix_proposal.py` | Tests proposal and review handling |
+| `test_fix_apply.py` | Tests patch validation and application |
+| `test_todo.py` | Tests the demonstration application |
+| `bug-to-fix-buddy.template.yaml` | Switch agent and room template |
 
-The to-do application is the demonstration target, not the limit of the intended agent workflow. Bug-to-Fix Buddy is designed to investigate different projects selected for individual tasks.
+Generated reports, proposals, and application data are local workflow records rather than source files.
 
 ## Requirements
 
-- Python 3
+- Python 3.11 or later
 - Git
 - A terminal
-- Switch and Slack for the collaboration demonstration
+- Switch Console, if you want to use the agent collaboration workflow
 
-The Python application and workflow tools use the Python standard library.
+The Python toolkit uses the Python standard library. No external Python package installation is required for the core scripts.
 
 ## Getting Started
 
 Clone the repository:
 
-```powershell
+```bash
 git clone https://github.com/hollowlink123/bug-to-fix-buddy.git
 cd bug-to-fix-buddy
 ```
 
-Check Python:
+Check your Python installation:
 
-```powershell
-py --version
+```bash
+python --version
 ```
-
-On systems where the `py` launcher is unavailable, use `python` or `python3` instead.
-
-### Run the To-Do Demonstration
 
 Run the demonstration:
 
-```powershell
-py todo.py demo
+```bash
+python todo.py demo
 ```
 
-List the tasks:
+List the demonstration tasks:
 
-```powershell
-py todo.py list
+```bash
+python todo.py list
 ```
 
-Complete a task by its ID:
+Mark a task as complete:
 
-```powershell
-py todo.py done 2
+```bash
+python todo.py done 1
 ```
 
-If `tasks.json` does not exist, the application starts with two example tasks. Successful completion commands save the updated task data.
+The demonstration application starts with two example tasks when no saved task file exists. Task data is stored locally in `tasks.json`.
 
-The JSON file is stored beside `todo.py`.
+## Using the Python Toolkit
 
-## The Demonstration Bugs
+### 1. Create a bug report
 
-The to-do application has been used to demonstrate two different bug scenarios.
-
-### 1. Task ID and List Position
-
-The original bug involved treating a task ID as a Python list position.
-
-Task IDs start at 1, whereas Python list positions start at 0. Using an ID directly as an index can therefore select the wrong task.
-
-The correction searches for a task using its actual ID:
-
-```python
-matching_task = next(
-    (task for task in tasks if task["id"] == task_id),
-    None,
-)
+```bash
+python bug_report.py "Describe the bug"
 ```
 
-This ensures that the application selects the task whose ID matches the requested ID.
+The report is saved as a JSON file in `bug_reports/`.
 
-### 2. Duplicate Task IDs
+### 2. Create and review a fix proposal
 
-A separate bug was identified in saved JSON data.
+Use the proposal CLI to create a proposal for a saved bug report:
 
-The application previously accepted multiple tasks with the same ID. Since completion searched for the first matching ID, it could silently update only one of the duplicate tasks.
-
-The fix validates IDs while loading tasks and rejects duplicates before the application can modify the task data.
-
-A regression test verifies that duplicate IDs produce an error and leave the original JSON file unchanged.
-
-## Bug Report and Fix Proposal
-
-### Create a bug report
-
-```powershell
-py bug_report.py "Describe the bug"
+```bash
+python fix_proposal.py --help
 ```
 
-Bug report JSON files are stored under `bug_reports/` and ignored by Git.
+The proposal workflow collects the proposed fix, its rationale, and a unified diff patch. Use the CLI help for the exact arguments supported by the current version.
 
-### Create a fix proposal
+Preview a saved proposal:
 
-For an existing report:
-
-```powershell
-py fix_proposal.py create <report-id>
+```bash
+python fix_proposal.py show <proposal-id>
 ```
 
-The CLI requests:
+The preview displays the proposal details and its SHA-256 hash.
 
-- Proposal summary
-- Rationale
-- Proposed change
-- Unified diff patch
+### 3. Record a decision
 
-### Preview a proposal
+After reviewing the exact proposal, record an approval using the hash shown in its preview:
 
-```powershell
-py fix_proposal.py show <proposal-id>
+```bash
+python fix_proposal.py decide <proposal-id> approve --sha256 <reviewed-sha256>
 ```
 
-The preview displays the proposal's SHA-256 hash. This hash covers the complete saved proposal JSON.
+To reject it:
 
-### Record an approval or rejection
-
-After manually verifying the decision in the collaboration workflow:
-
-```powershell
-py fix_proposal.py decide <proposal-id> approve --sha256 <sha256>
+```bash
+python fix_proposal.py decide <proposal-id> reject --sha256 <reviewed-sha256>
 ```
 
-To reject the proposal:
+A proposal cannot be approved using a hash that does not match its saved contents. The original proposal is preserved, and a revised proposal receives a new ID.
 
-```powershell
-py fix_proposal.py decide <proposal-id> reject --sha256 <sha256>
+### 4. Preview and apply an approved patch
+
+Check the application command:
+
+```bash
+python fix_apply.py --help
 ```
 
-Decisions are stored separately under `fix_proposals/reviews/`.
+The application workflow requires the proposal ID and selected project directory. It validates the proposal, approval record, and target before showing the preview. The user must type the exact proposal ID to confirm application.
 
-The original proposal is not overwritten. A revision is recorded as a new proposal with a new ID.
+## Target and Patch Safety
 
-The CLI records manually verified decisions; it does not independently authenticate a Switch or Slack user.
+The toolkit is deliberately restricted.
 
-## Preview and Apply an Approved Fix
+- Each proposal records the canonical target directory and a target binding ID.
+- The approval record is bound to the same target and proposal hash.
+- The selected target and approval are checked before preview and again before writing.
+- Missing or invalid target metadata causes the operation to stop.
+- Only newline-terminated unified diffs that modify existing UTF-8 files are supported.
+- File creation, deletion, and renaming are not supported.
+- Absolute paths, directory traversal, symlinks, and mismatched patch context are rejected.
+- Commands supplied inside a proposal are not executed.
+- The toolkit does not automatically run the target project's tests.
 
-After a proposal has been approved, run:
+The target binding identifies the selected local directory. It does not independently verify a Git remote or authenticate the person approving a proposal.
 
-```powershell
-py fix_apply.py <proposal-id> <project-directory>
-```
+## Switch Collaboration
 
-The tool displays the proposed changes and requires the user to type the proposal ID to continue.
+The project includes a Switch template for configuring the Bug-to-Fix Buddy agent and its shared room instructions.
 
-The patch application tool:
+The intended collaboration workflow is:
 
-- Accepts supported unified diffs that modify existing UTF-8 files.
-- Rejects new or deleted files and renames.
-- Rejects traversal paths, absolute paths, and symlinks.
-- Checks that patch context matches the existing source.
-- Does not execute commands supplied by a proposal.
-- Attempts to restore files if a replacement fails.
+1. A user reports a bug in the shared room.
+2. The agent investigates the selected project.
+3. The agent explains its findings and prepares a proposed change.
+4. A person reviews the proposal and explicitly approves or rejects it.
+5. The Python toolkit validates and applies an approved patch.
+6. The resulting changes are inspected and tested.
 
-Application results are stored under `fix_proposals/applications/` when the result record can be written.
+**Important:** Switch provides the agent collaboration and instructions. The Python scripts provide the local bug-report, proposal, approval-record, and patch-application functionality. A direct automatic integration connecting the Python toolkit to Switch is not implemented.
 
-## Switch and Slack Collaboration
+Agent instructions do not replace operating-system permissions or sandbox restrictions.
 
-The agent's investigation and proposed-fix workflow was demonstrated in a Switch room connected to the Slack channel `#bug-to-fix-demo`.
+## Running Tests
 
-During the demonstration:
+Run the test suite from the repository root:
 
-1. A bug was discussed with the agent.
-2. The agent inspected the relevant project code.
-3. It explained the identified problem and proposed a code change.
-4. The project owner reviewed and approved the proposal.
-5. The approved change was applied and verified.
-
-Switch and Slack were used for collaboration and communication.
-
-The Python CLI, proposal management, approval records, and patch application are implemented in this repository. An automatic integration connecting the Python application directly to Switch and Slack is not implemented.
-
-## Tests
-
-Run the complete test suite:
-
-```powershell
-py -m unittest -v
+```bash
+python -m unittest discover -v
 ```
 
 The tests cover:
 
-- Bug report creation and loading.
-- Proposal creation and preview.
-- Approval and rejection records.
-- Proposal hash verification.
-- Patch validation and application.
-- To-do task listing and completion.
-- Task completion persistence.
-- Unknown task IDs.
-- Invalid and malformed task data.
-- Duplicate task ID rejection.
-- Preservation of the original task file when duplicate IDs are detected.
+- Bug report creation and loading
+- Proposal creation and preview
+- Approval and rejection records
+- Proposal hash verification
+- Target and approval binding
+- Patch parsing and validation
+- Patch application safeguards
+- Task listing and completion
+- Invalid task data and duplicate task IDs
 
-## Limitations and Security Considerations
+Only report tests as passing after actually running them.
 
-- The to-do application is a demonstration target, not a complete task-management application.
-- It starts with two example tasks and does not provide commands to add, edit, or delete tasks.
-- Task data is stored locally in `tasks.json`.
-- Malformed JSON and invalid task data must be repaired manually.
-- Proposal decisions are local records of manually verified messages. The CLI cannot authenticate the identity of the person who sent a message.
-- The patch tool supports a restricted subset of unified diff operations.
-- Proposal-supplied commands are not executed.
-- Rollback is attempted if file replacement fails, but restoration is not guaranteed if rollback also fails.
-- If writing an application result fails after source files have been replaced, source files may remain changed without a saved application record.
-- Written agent instructions guide behavior but do not replace host-level permission and sandbox enforcement.
+## Limitations
+
+- The to-do application is a demonstration target, not a complete task-management product.
+- The patch tool supports a restricted subset of unified diffs.
+- The toolkit does not guarantee compatibility with every repository.
+- Approval records do not cryptographically authenticate the approver's identity.
+- The toolkit does not automatically run project tests.
+- Rollback is attempted if file replacement fails, but restoration cannot be guaranteed if rollback also fails.
+- A failure to save an application record after source files have changed can leave modified files without a corresponding saved record.
+- Committing, pushing, and deploying changes are outside the automatic workflow.
 
 ## License
 
@@ -266,6 +220,6 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## Project Goal
 
-Bug-to-Fix Buddy demonstrates how AI-assisted software debugging can be organized into a reviewable workflow.
+Bug-to-Fix Buddy explores a safer, more reviewable way to use AI during software debugging.
 
-The agent helps investigate problems and prepare changes, but people retain control over approving and applying code modifications.
+The agent assists with investigation and patch preparation, while people retain control over reviewing, approving, and applying code changes.
