@@ -23,7 +23,7 @@ The agent must not edit source code before approval. Approval applies to the exa
 
 ## Architecture
 
-\`\`\`text
+```text
 Developers
     |
     v
@@ -45,7 +45,7 @@ Codex agent
     |
     v
 Findings and results returned to the team conversation
-\`\`\`
+```
 
 The Switch template configures the Codex agent with the toolkit repository as its working directory. For each task, the reporter must select the **target project separately**. The toolkit repository is not automatically treated as the project to be repaired.
 
@@ -77,22 +77,22 @@ The patch tool is intentionally limited to newline-terminated unified diffs that
 
 ### 1. Get the toolkit
 
-\`\`\`bash
+```bash
 git clone https://github.com/hollowlink123/bug-to-fix-buddy.git
 cd bug-to-fix-buddy
 python --version
-\`\`\`
+```
 
 The core Python scripts use the standard library; no additional Python packages are required for the toolkit.
 
 ### 2. Import the Switch template
 
-Import \`bug-to-fix-buddy.template.yaml\` into your Switch workspace and provide:
+Import `bug-to-fix-buddy.template.yaml` into your Switch workspace and provide:
 
 - **Agent name** — a unique lowercase name for the agent.
 - **Room name** — the shared room for the workflow.
 - **Bridge** — the Slack bridge configured on your Switch server.
-- **Toolkit directory** — the local repository directory containing \`fix_proposal.py\` and \`fix_apply.py\`.
+- **Toolkit directory** — the local repository directory containing `fix_proposal.py` and `fix_apply.py`.
 
 Use the configured Slack bridge to connect the room to the team's chosen Slack conversation.
 
@@ -112,39 +112,39 @@ You can also explore the demonstration application and toolkit without setting u
 
 Run the small example app:
 
-\`\`\`bash
+```bash
 python todo.py demo
 python todo.py list
 python todo.py done 1
-\`\`\`
+```
 
 Create a structured bug report:
 
-\`\`\`bash
+```bash
 python bug_report.py "Describe the observed bug"
-\`\`\`
+```
 
 See the available proposal commands:
 
-\`\`\`bash
+```bash
 python fix_proposal.py --help
-\`\`\`
+```
 
 Preview a proposal and record a decision using the proposal ID and the SHA-256 value shown by its preview:
 
-\`\`\`bash
+```bash
 python fix_proposal.py show <proposal-id>
 python fix_proposal.py decide <proposal-id> approve --sha256 <reviewed-sha256>
-\`\`\`
+```
 
-To reject a proposal, use \`reject\` instead of \`approve\`.
+To reject a proposal, use `reject` instead of `approve`.
 
 Preview and apply an approved proposal:
 
-\`\`\`bash
+```bash
 python fix_apply.py --help
 python fix_apply.py <proposal-id> <target-project-directory>
-\`\`\`
+```
 
 The application command displays the proposed changes and requires you to type the exact proposal ID before it writes anything. Run it only against the target directory recorded in the proposal.
 
@@ -152,9 +152,9 @@ The application command displays the proposed changes and requires you to type t
 
 Run the toolkit test suite from the repository root:
 
-\`\`\`bash
+```bash
 python -m unittest discover -v
-\`\`\`
+```
 
 The tests cover bug-report handling, proposal and decision records, patch validation and application safeguards, and the demonstration application.
 
@@ -174,14 +174,14 @@ The tests cover bug-report handling, proposal and decision records, patch valida
 
 | Path | Purpose |
 |---|---|
-| \`bug-to-fix-buddy.template.yaml\` | Switch agent and shared-room template |
-| \`bug_report.py\` | Creates structured bug reports |
-| \`fix_proposal.py\` | Creates proposals and records review decisions |
-| \`fix_apply.py\` | Validates, previews, and applies approved patches |
-| \`todo.py\` | Small demonstration application |
-| \`test_*.py\` | Toolkit and demonstration tests |
-| \`bug_reports/\` | Local bug-report records |
-| \`fix_proposals/\` | Local proposal, review, and application records |
+| `bug-to-fix-buddy.template.yaml` | Switch agent and shared-room template |
+| `bug_report.py` | Creates structured bug reports |
+| `fix_proposal.py` | Creates proposals and records review decisions |
+| `fix_apply.py` | Validates, previews, and applies approved patches |
+| `todo.py` | Small demonstration application |
+| `test_*.py` | Toolkit and demonstration tests |
+| `bug_reports/` | Local bug-report records |
+| `fix_proposals/` | Local proposal, review, and application records |
 
 ## License
 
